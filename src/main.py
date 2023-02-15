@@ -38,7 +38,7 @@ def main():
 
     #file_names = [f'data/rad{rad[i]}/{materials[i]}.pkl' for i in range(len(materials))]
     
-    file_names = [f'data/{task}.pkl' for task in tasks]
+    file_names = [f'../data/plates/{task}.pkl' for task in tasks]
 
     
     SAVE_MODELS = False
