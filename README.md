@@ -2,4 +2,4 @@
 Cooperative Data-Driven Modeling
 
 
-Yes, yes, I know that this repo does not follow the instructions...I will change this later
+Yes, yes, I know this repository does not follow the instructions...I will change this later
