@@ -1,3 +1,24 @@
+""" The module contains auxiliary functions.
+
+Functions
+---------
+set_seed
+    The function sets random seed.
+gru_total_params
+    The function calculates the number of trainable parameters in the model.
+gru_total_params_mask
+    The function calculates the number of trainable parameters in the subnetwork.
+loss_func
+    The function calculates MSE Loss.
+error_func
+    The function calculates relative error.
+process_data
+    The function calculates relative error.
+eval
+   The function prints losses and relative errors for every task.
+"""
+
+
 import torch
 import torch.nn as nn
 import pandas as pd
@@ -11,6 +32,17 @@ else:
 
 
 def set_seed(seed=0):
+    """ The function sets random seed.
+    
+    Parameters
+    ----------
+    seed : int
+        The value of seed.
+   
+    Returns
+    -------   
+    """    
+    
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -20,6 +52,19 @@ def set_seed(seed=0):
     return
 
 def gru_total_params(model):
+    """ The function calculates the number of trainable parameters in the model.
+    
+    Parameters
+    ----------
+    model : PyTorch model
+        The learnable GRU model.
+   
+    Returns
+    -------
+    total_number : int
+        Total number of trainable parameters.    
+    """    
+    
     total_number = 0
     for param_name in list(model.state_dict()):
         param = model.state_dict()[param_name]
@@ -29,6 +74,22 @@ def gru_total_params(model):
 
 
 def gru_total_params_mask(model, task_id=0):
+    """ The function calculates the number of trainable parameters in the subnetwork.
+    
+    Parameters
+    ----------
+    model : PyTorch model
+        The learnable GRU model.
+    task_id : int
+        The identifier for the curren subnetwork (task).        
+   
+    Returns
+    -------
+    total_number : int
+        Total number of trainable parameters in the subnetwork task_id
+    """    
+    
+    
     total_number = torch.tensor(0, dtype=torch.int32)
     for name in model.rnn_cell_masks:
         total_number += model.tasks_masks[task_id][name].sum().int()
@@ -38,17 +99,80 @@ def gru_total_params_mask(model, task_id=0):
 
 
 def loss_func(y, y_pred):
-    #loss = torch.mean((y-y_pred).norm(dim=1)/y.norm(dim=1)) 
+    """ The function calculates MSE Loss.
+    
+    Parameters
+    ----------
+    y : torch.FloatTensor
+        True values of stress components.
+    y_pred : torch.FloatTensor
+        Predicted values of stress components.       
+   
+    Returns
+    -------
+    loss : torch.tensor
+        MSE Loss
+    """    
+    
+    
     loss = nn.MSELoss()(y, y_pred)
     return loss
 
 
 def error_func(y, y_pred, dim=(1)):
+    """ The function calculates relative error.
+    
+    Parameters
+    ----------
+    y : torch.FloatTensor
+        True values of stress components.
+    y_pred : torch.FloatTensor
+        Predicted values of stress components.
+    dim : tuple
+        Dimensions with respect to which norm is applied.        
+   
+    Returns
+    -------
+    err : torch.tensor
+        Average relative error
+    """    
+    
+    
+    
     err = torch.mean((y-y_pred).norm(dim=dim)/y.norm(dim=dim)) 
     return err
 
 
 def process_data(file_name, num_train=500, num_val=100, num_test=100, idx_min=0, idx_max=101, SCALE=True, problem='plasticity-rve'):
+    """ The function calculates relative error.
+    
+    Parameters
+    ----------
+    file_name : list
+        List of file names with data.
+    num_train, num_val, num_test : int, int, int
+        Number of rain/validation/test paths
+    idx_min, idx_max : int, int
+        Min and max timesteps in the paths.
+    SCALE : bool
+        Scale data or not.
+    problem : str
+        Type of the problem
+   
+    Returns
+    -------
+    x_train, y_train : torch.FloatTensor, torch.FloatTensor
+        Train strain and stress tensors.
+    x_val, y_val : torch.FloatTensor, torch.FloatTensor
+        Validation strain and stress tensors.
+    x_test, y_test : torch.FloatTensor, torch.FloatTensor
+        Test strain and stress tensors.
+    x_mean, x_std : torch.FloatTensor, torch.FloatTensor
+        Mean and Std of strain data.
+    y_mean, y_std : torch.FloatTensor, torch.FloatTensor
+        Mean and Std of stress data.
+    """      
+    
     df = pd.read_pickle(file_name)
     
     train_idx = []
@@ -57,7 +181,7 @@ def process_data(file_name, num_train=500, num_val=100, num_test=100, idx_min=0,
     
     train_points = 800
     idx = np.arange(1000)
-    train_idx = idx[:train_points][ :num_train]  #np.random.permutation(idx[:train_points])[ :num_train]
+    train_idx = idx[:train_points][ :num_train]
     val_idx = idx[train_points : (train_points + num_val)]
     test_idx = idx[(train_points + num_val) : (train_points + num_val + num_test)]
     
@@ -111,17 +235,38 @@ def process_data(file_name, num_train=500, num_val=100, num_test=100, idx_min=0,
         y_train = (y_train - y_mean)/y_std
         y_val = (y_val - y_mean)/y_std
         y_test = (y_test - y_mean)/y_std
-        
-        #x_train, y_train, x_val, y_val, x_test, y_test = x_train[:, 1:], y_train[:, 1:], x_val[:, 1:], y_val[:, 1:], x_test[:, 1:], y_test[:, 1:]       
-        
+               
         
     return x_train, y_train, x_val, y_val, x_test, y_test, x_mean, x_std, y_mean, y_std
 
 
 
 
-def eval(net, file_names, num_train=500, num_val=100, num_test=100, idx_min=0, idx_max=101, dim=(1)):
-    #set_seed(seed=seed)
+def eval(net, file_names, nums_train=[800, 100, 100, 100], num_val=100, num_test=100, idx_min=0, idx_max=101, dim=(1), problem='plasticity-plates'):
+    """ The function prints losses and relative errors for every task.
+    
+    Parameters
+    ----------
+    net : PyTorch model
+        The learnable GRU model.
+    file_name : list
+        List of file names with data.
+    nums_train : list
+        List of the number of training paths for each task.
+    num_val, num_test : int, int
+        Number of rain/validation/test paths
+    idx_min, idx_max : int, int
+        Min and max timesteps in the paths.
+    dim : tuple
+        Dimensions with respect to which norm is applied.
+   
+    Returns
+    -------
+    losses : list
+        Loss on every task.
+    errors : list
+        Error on every task.
+    """
     
     num_tasks = len(file_names)
    
@@ -132,21 +277,16 @@ def eval(net, file_names, num_train=500, num_val=100, num_test=100, idx_min=0, i
     errors = []
 
     for task_id in range(num_tasks):
-        if num_tasks > 1:
-            if task_id == 0:
-                train_points = 800
-            else:
-                train_points = num_train 
-        else:
-            train_points = num_train
+        num_train = nums_train[task_id]
         
         
         x_train, y_train, x_val, y_val, x_test, y_test, x_mean, x_std, y_mean, y_std = process_data(file_names[task_id], 
-                                                                                                    num_train=train_points, 
+                                                                                                    num_train=num_train, 
                                                                                                     num_val=num_val, 
                                                                                                     num_test=num_test,
                                                                                                     idx_min=idx_min,
-                                                                                                    idx_max=idx_max
+                                                                                                    idx_max=idx_max,
+                                                                                                    problem=problem
                                                                                                     )     
         
         

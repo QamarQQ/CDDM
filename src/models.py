@@ -1,3 +1,15 @@
+""" The module contains classes for the Gated Recurrent Unit (GRU).
+
+Classes
+-------
+GRUCell
+    A class for one GRU cell.
+GRU
+    A class for GRU neural network.
+"""
+
+
+
 import torch
 import torch
 import torch.nn as nn
@@ -14,170 +26,28 @@ if torch.cuda.is_available():
 else:
     device = torch.device('cpu')
 
-
-class DNN(torch.nn.Module):
-    def __init__(self, num_inputs=4, num_outputs=4, num_layers=5, num_neurons=20, activation='tanh', device='cpu', num_heads=1):
-        super(DNN, self).__init__()
-        
-        if activation == 'identity':
-            self.activation = torch.nn.Identity()
-        elif activation == 'tanh':
-            self.activation = torch.nn.functional.tanh
-        elif activation == 'relu':
-            self.activation = torch.nn.functional.relu
-        elif activation == 'leaky_relu':
-            self.activation = torch.nn.functional.leaky_relu    
-        elif activation == 'gelu':
-            self.activation = torch.nn.functional.gelu
-        elif activation == 'sin':
-            self.activation = torch.sin
-                
-        self.num_layers = num_layers
-        self.num_neurons = num_neurons
-        self.num_inputs = num_inputs
-        self.num_outputs = num_outputs
-        self.num_heads = num_heads
-        self.num_tasks = 0
-        self.task_id = 0
-        self.device = device
-        
-        self.layers = self.create_layers(num_layers, num_neurons, num_inputs, num_outputs, num_heads)     
-        self.base_masks = self.create_masks(num_layers, num_neurons, num_inputs, num_outputs, num_heads)
-        
-        #self.reset_parameters()
-
-        self.tasks_masks = []
-        self._add_mask(task_id=0, num_inputs=num_inputs, num_outputs=num_outputs)
-
-        self.trainable_mask = copy.deepcopy(self.tasks_masks[0])
-        self.masks_union = copy.deepcopy(self.tasks_masks[0])
-        self.masks_intersection = copy.deepcopy(self.tasks_masks[0])
-
-    def reset_parameters(self):
-        std = 1.0 / np.sqrt(self.num_neurons)
-        for w in self.parameters():
-            w.data.uniform_(-std, std)    
-        
-    def create_layers(self, num_layers=5, num_neurons=20, num_inputs=4, num_outputs=4, num_heads=1):
-        layers = [torch.nn.Linear(num_inputs*num_heads, num_neurons)]
-        
-        for l in range(1, num_layers-1):
-            layers.append(torch.nn.Linear(num_neurons, num_neurons))
-        
-        layers.append(torch.nn.Linear(num_neurons, num_outputs*num_heads))
-        
-        return nn.Sequential(*layers)
-    
-    
-    def create_masks(self, num_layers=5, num_neurons=20, num_inputs=4, num_outputs=4, num_heads=1):
-        masks = [torch.ones(num_neurons, num_inputs*num_heads), torch.ones(num_neurons)]
-        
-        for l in range(1, num_layers-1):
-            masks.append(torch.ones(num_neurons, num_neurons))
-            masks.append(torch.ones(num_neurons))
-        
-        masks.append(torch.ones(num_outputs*num_heads, num_neurons))
-        masks.append(torch.ones(num_outputs*num_heads))
-        
-        return masks
-    
-    def _add_mask(self, task_id, num_inputs=3, num_outputs=3):
-        self.num_tasks += 1
-        self.tasks_masks.append(copy.deepcopy(self.base_masks))
-        
-        if self.num_heads > 1:   
-            if task_id > 0:
-                self.tasks_masks[task_id][0][:, :task_id*num_inputs] = 0
-
-                self.tasks_masks[task_id][-2][:task_id*num_outputs, :] = 0
-                self.tasks_masks[task_id][-1][:task_id*num_outputs] = 0
-
-            if task_id < self.num_heads-1:
-                self.tasks_masks[task_id][0][:, num_inputs*(task_id+1):] = 0
-
-                self.tasks_masks[task_id][-2][(task_id+1)*num_outputs:, :] = 0
-                self.tasks_masks[task_id][-1][(task_id+1)*num_outputs:] = 0
-        
-
-    def set_masks_union(self):
-        self.masks_union = copy.deepcopy(self.tasks_masks[0])
-        for id in range(1, self.num_tasks):
-            for l in range(0, len(self.base_masks)):
-                self.masks_union[l] = copy.deepcopy( 1*torch.logical_or(self.masks_union[l], self.tasks_masks[id][l]) )
-
-    def set_masks_intersection(self):
-        self.masks_intersection = copy.deepcopy(self.tasks_masks[0])
-        for id in range(1, self.num_tasks):
-            for l in range(0, len(self.base_masks)):
-                self.masks_intersection[l] = copy.deepcopy( 1*torch.logical_and(self.masks_intersection[l], self.tasks_masks[id][l]) )
-
-    def set_trainable_masks(self, task_id):
-        if task_id > 0:
-            for l in range(len(self.trainable_mask)):
-                self.trainable_mask[l] = copy.deepcopy( 1*((self.tasks_masks[task_id][l] - self.masks_union[l]) > 0) )
-        else:    
-            self.trainable_mask = copy.deepcopy(self.tasks_masks[task_id]) 
-            
-    def _apply_mask(self, task_id):
-        l = 0
-        for name, param in self.layers.named_parameters():
-            param.data = param.data*(self.tasks_masks[task_id][l]).to(self.device)
-            l += 1          
-        
-        
-    def forward(self, x):   
-        layer = list(self.layers.children())[0]
-        if self.num_heads > 1:
-            active_weights = (layer.weight[:, self.num_inputs*self.task_id:(self.num_inputs*(self.task_id+1))]*self.tasks_masks[self.task_id][0][:, self.num_inputs*self.task_id:(self.num_inputs*(self.task_id+1))].to(device))
-        else:
-            active_weights = layer.weight*self.tasks_masks[self.task_id][0].to(device)
-            
-        active_bias = layer.bias*self.tasks_masks[self.task_id][1].to(device)
-        x = F.linear(x, weight=active_weights, bias=active_bias)
-        x = self.activation(x)        
-        
-        for l, layer in enumerate(list(self.layers.children())[1:-1]):
-            active_weights = layer.weight*self.tasks_masks[self.task_id][2*(l+1)].to(device)
-            active_bias = layer.bias*self.tasks_masks[self.task_id][2*(l+1)+1].to(device)
-            x = F.linear(x, weight=active_weights, bias=active_bias)
-            x = self.activation(x)
-            
-        layer = list(self.layers.children())[-1]
-        active_weights = layer.weight*self.tasks_masks[self.task_id][-2].to(device)
-        active_bias = layer.bias*self.tasks_masks[self.task_id][-1].to(device)
-        if self.num_heads > 1:
-            x = F.linear(x, weight=active_weights, bias=active_bias)[:, self.num_outputs*self.task_id:self.num_outputs*(self.task_id+1)]
-        else:
-            x = F.linear(x, weight=active_weights, bias=active_bias)
-        
-        return x
-    
-    def _save_masks(self, file_name='net_masks.pt'):
-        masks_database = {}
-        
-        for task_id in range(self.num_tasks):
-            masks_database[task_id] = []
-            for l in range(len(self.tasks_masks[0])):
-                masks_database[task_id].append(self.tasks_masks[task_id][l])
-
-        torch.save(masks_database, file_name)
-
-    def _load_masks(self, file_name='net_masks.pt', num_tasks=1):
-        masks_database = torch.load(file_name)
-        self.num_tasks = 1
-        for task_id in range(num_tasks):
-            for l in range(len(self.tasks_masks[task_id])):
-                self.tasks_masks[task_id][l] = masks_database[task_id][l]
-            
-            if task_id+1 < num_tasks:
-                self._add_mask(task_id+1)
-                
-        self.set_masks_union()
-        self.set_masks_intersection()
-        
         
 class GRUCell(nn.Module):
+    """ Gated Recurrent Unit cell.
+    """
     def __init__(self, input_size, hidden_size, task_id, num_layer, device, bias=True):
+        """ Constructor.
+        Parameters
+        ----------
+        input_size : int
+            Number of input neurons.
+        hidden_size : int
+            Dimension of a hidden state.
+        task_id : int
+            Current task identifier.    
+        num_layer : int
+            Number of the current GRU cell.
+        device: torch.device ('cpu' or 'cuda')
+            The device on which PyTorch model and all torch.Tensor are or will be allocated.
+        bias : bool
+            Use bias or not        .
+        """
+        
         super(GRUCell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -193,34 +63,46 @@ class GRUCell(nn.Module):
 
         self.reset_parameters()
 
-        self.base_masks = self.create_masks(num_layer)
+        self.base_masks = self._create_masks(num_layer)
 
         self.tasks_masks = []
 
 
-    def create_masks(self, num_layer=0):
+    def _create_masks(self, num_layer=0):
+        """ The method creates the mask for the current cell.
+        
+        Parameters
+        ----------
+        num_layers : int
+            Number of the current GRU cells.
+    
+        Returns
+        -------
+        masks : list
+            List of masks for the cell.
+        """
         masks = {}
         for name, w in list(self.named_parameters()):
             masks[f'rnn_cell_list.{num_layer}.'+ name] = torch.ones_like(w)   
 
         return masks
 
-    def _add_mask(self):        
+    def add_mask(self): 
+        """ The method adds a new mask for a new task. 
+        """
+        
         self.tasks_masks.append(copy.deepcopy(self.base_masks))       
 
 
     def reset_parameters(self):
+        """ The method initializes the random parameters for the GRU.   
+        """
+        
         std = 1.0 / np.sqrt(self.hidden_size)
         for w in self.parameters():
             w.data.uniform_(-std, std)
 
     def forward(self, input, hx=None, mode=None, alpha=0.95):
-
-        # Inputs:
-        #       input: of shape (batch_size, input_size)
-        #       hx: of shape (batch_size, hidden_size)
-        # Output:
-        #       hy: of shape (batch_size, hidden_size)
 
         if hx is None:
             hx = Variable(input.new_zeros(input.size(0), self.hidden_size))
@@ -283,7 +165,27 @@ class GRUCell(nn.Module):
         return hy
 
 class GRU(nn.Module):
+    """ Gated Recurrent Unit neural network.
+    """
     def __init__(self, input_size, seq_len, hidden_size, num_layers, output_size, device, bias=True):
+        """ Constructor.
+        Parameters
+        ----------
+        input_size : int
+            Number of input neurons.
+        seq_len : int
+            Input data sequence length.
+        hidden_size : int
+            Dimension of a hidden state.
+        num_layers : int
+            Number of GRU cells.
+        output_size : int
+            Number of output neurons.
+        device: torch.device ('cpu' or 'cuda')
+            The device on which PyTorch model and all torch.Tensor are or will be allocated.
+        bias : bool
+            Use bias or not        .
+        """
         super(GRU, self).__init__()
 
         self.input_size = input_size
@@ -302,10 +204,10 @@ class GRU(nn.Module):
         self.rnn_cell_list = nn.ModuleList()
         self.rnn_cell_masks = {}
 
-        self.rnn_cell_list, self.rnn_cell_masks = self.make_layers(input_size, 
-                                                                   hidden_size, 
-                                                                   num_layers, 
-                                                                   bias)
+        self.rnn_cell_list, self.rnn_cell_masks = self._make_layers(input_size, 
+                                                                    hidden_size,
+                                                                    num_layers, 
+                                                                    bias)
        
         self.fc = nn.Linear(self.hidden_size, self.output_size)
         self.rnn_cell_masks['fc.weight'] = torch.ones(self.output_size, self.hidden_size)
@@ -313,13 +215,34 @@ class GRU(nn.Module):
         
 
         self.tasks_masks = []
-        self._add_mask(task_id=0)
+        self.add_mask(task_id=0)
 
         self.trainable_mask = copy.deepcopy(self.tasks_masks[0])
         self.masks_union = copy.deepcopy(self.tasks_masks[0])
         self.masks_intersection = copy.deepcopy(self.tasks_masks[0])
 
-    def make_layers(self, input_size, hidden_size, num_layers, bias):
+    def _make_layers(self, input_size, hidden_size, num_layers, bias):
+        """ The method creates layers and masks for the GRU.
+        
+        Parameters
+        ----------
+        input_size : int
+            Number of input neurons.
+        hidden_size : int
+            Dimension of a hidden state.
+        num_layers : int
+            Number of GRU cells.
+        bias : bool
+            Use bias or not      
+        
+        Returns
+        -------
+        rnn_cell_list : list
+            List of GRU cells.
+        rnn_cell_masks : list
+            List of GRUcells masks.
+        """
+        
         rnn_cell_list = nn.ModuleList()
         rnn_cell_masks = {}
         
@@ -345,17 +268,35 @@ class GRU(nn.Module):
 
         return rnn_cell_list, rnn_cell_masks  
 
-    def _add_mask(self, task_id, overlap=True):
+    def add_mask(self, task_id, overlap=True):
+        """ The method adds a new mask for a new task.
+        
+        Parameters
+        ----------
+        task_id : int
+            New task identifier.
+        overlap : bool
+            Overlapping subnetworks or not      
+        """
+        
         self.num_tasks += 1
         self.tasks_masks.append(copy.deepcopy(self.rnn_cell_masks))
 
         for cell in self.rnn_cell_list:
-            cell._add_mask()
+            cell.add_mask()
             for name in cell.tasks_masks[task_id]:
                 self.tasks_masks[task_id][name] = cell.tasks_masks[task_id][name]
 
 
     def set_task(self, task_id):
+        """ The method activates the subnetwork.
+        
+        Parameters
+        ----------
+        task_id : int
+            Task identifier.   
+        """
+        
         self.task_id = task_id
 
         for cell in self.rnn_cell_list:
@@ -363,18 +304,30 @@ class GRU(nn.Module):
 
     
     def set_masks_union(self):
+        """ The method sets the union of all masks. 
+        """
         self.masks_union = copy.deepcopy(self.tasks_masks[0])
         for task_id in range(1, self.num_tasks):
             for name in self.rnn_cell_masks:
                 self.masks_union[name] = copy.deepcopy( 1*torch.logical_or(self.masks_union[name], self.tasks_masks[task_id][name]) )
 
     def set_masks_intersection(self):
+        """ The method sets the intersection of all masks. 
+        """
         self.masks_intersection = copy.deepcopy(self.tasks_masks[0])
         for task_id in range(1, self.num_tasks):
             for name in self.rnn_cell_masks:
                 self.masks_intersection[name] = copy.deepcopy( 1*torch.logical_and(self.masks_intersection[name], self.tasks_masks[task_id][name]) )
 
     def set_trainable_masks(self, task_id):
+        """ The method sets a mask for trainable parameters for the current task.
+        
+        Parameters
+        ----------
+        task_id : int
+            Current task identifier.
+        """
+        
         if task_id > 0:
             for name in self.trainable_mask:
                 self.trainable_mask[name] = copy.deepcopy( 1*((self.tasks_masks[task_id][name] - self.masks_union[name]) > 0) )
@@ -384,11 +337,6 @@ class GRU(nn.Module):
 
 
     def forward(self, input, hx=None):
-
-        # Input of shape (batch_size, seqence length, input_size)
-        #
-        # Output of shape (batch_size, output_size)
-
         if hx is None:
             if torch.cuda.is_available():
                 h0 = Variable(torch.zeros(self.num_layers, input.size(0), self.hidden_size).cuda())
@@ -432,7 +380,15 @@ class GRU(nn.Module):
         return out
 
 
-    def _save_masks(self, file_name='net_masks.pt'):
+    def save_masks(self, file_name='net_masks.pt'):
+        """ The method saves all masks.
+        
+        Parameters
+        ----------
+        file_name : str
+            File to save.
+        """
+        
         masks_database = {}
         
         for task_id in range(self.num_tasks):
@@ -442,7 +398,17 @@ class GRU(nn.Module):
 
         torch.save(masks_database, file_name)
 
-    def _load_masks(self, file_name='net_masks.pt', num_tasks=1):
+    def load_masks(self, file_name='net_masks.pt', num_tasks=1):
+        """ The method loads all masks.
+        
+        Parameters
+        ----------
+        file_name : str
+            File to load.
+        num_tasks : int
+            Number of loaded tasks.
+        """
+        
         masks_database = torch.load(file_name)
         self.num_tasks = 1
         for task_id in range(num_tasks):

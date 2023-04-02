@@ -1,3 +1,14 @@
+""" This module contains functions that a related to the training loop.
+
+Functions
+---------
+rewrite_parameters
+    The function that keeps untrainable parameters fixed.
+train
+    The function for a training loop.
+"""
+
+
 import sys
 
 import torch
@@ -18,6 +29,18 @@ else:
 
 
 def rewrite_parameters(model, old_params):
+    """ The function that keeps untrainable parameters fixed.
+    
+    Parameters
+    ----------
+    model : PyTorch model
+        The learnable GRU model.
+    old_parameters : PyTorch model parameters generator
+        The parameters of the model before current task.
+        
+    Returns
+    -------
+    """       
     l = 0
     for (name, param), (old_name, old_param) in zip(model.named_parameters(), old_params()):
         param.data = param.data*model.trainable_mask[name].to(device) + old_param.data*(1-model.trainable_mask[name].to(device))
@@ -27,9 +50,48 @@ def rewrite_parameters(model, old_params):
 
 
 def train(net, x_train, y_train, x_val, y_val, device, lr, n_epochs, optimizer, scheduler, 
-          task_id=0, batch_size=100, path_to_save="model.pth", print_every=10):
+          task_id=0, batch_size=100, path_to_save="model.pth", result_folder='./result', print_every=10):
+    """ The function for a training loop.
+    
+    Parameters
+    ----------
+    net : PyTorch model
+        The learnable GRU model.
+    x_train, y_train : torch.FloatTensor, torch.FloatTensor
+        Training strain/stress data.
+    x_val, y_val : torch.FloatTensor, torch.FloatTensor
+        Validation strain/stress data    
+    optimizer : torch.optim.Optimizer
+        Optimizer.
+    scheduler : torch.optim.lr_scheduler
+        Scheduler for learning rate planning.
+    n_epochs : int
+        The number of training epochs.
+    lr : float
+        Learning rate.
+    device: torch.device ('cpu' or 'cuda')
+        The device on which PyTorch model and all torch.Tensor are or will be allocated.
+    task_id : int
+        Current task identifier.
+    batch_size : int 
+        Training batch size.
+    path_to_save : str
+        Paths for saving the model.
+    result_folder : str
+        Path for result folder.
+    print_every : int
+        Print training information every print_every epochs
+        
+    Returns
+    -------
+    net : PyTorch model
+        The network where FC layer is pruned for the task number task_id.    
+    """       
+    
+    
     min_loss = np.inf 
     old_params = copy.deepcopy(net.named_parameters)   
+    path_to_save = f"{result_folder}/{path_to_save}"
     
     num_train = x_train.size(0)
     if batch_size == -1:

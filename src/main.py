@@ -6,7 +6,11 @@ import random
 
 from utils import *
 from continual_learning import *
-from models import DNN, GRU
+from models import GRU
+
+import argparse
+
+import os
 
 
 if torch.cuda.is_available():
@@ -16,119 +20,145 @@ else:
 
 
 def main():
-    materials = [
-        '5_star',
-        #'2_on_y',
-        #'4_diagonal',
-        #'2_on_x',
-    ]
-    rad = [2] #[2, 2, 1, 1]
-
-    '''
-    materials = [
-        '4_diagonal',
-        '5_star',
-        '2_on_x',
-        '2_on_y'
-    ][::-1]
-    rad = [1, 2, 1, 2][::-1]
-    '''
     
-    tasks = ['A', 'B', 'C', 'D']
+    ################
+    # Arguments
+    ################
+    parser = argparse.ArgumentParser(description='Characterizing/Rethinking PINNs')
 
-    #file_names = [f'data/rad{rad[i]}/{materials[i]}.pkl' for i in range(len(materials))]
+    parser.add_argument('--problem', type=str, default='plasticity-plates', help='Problem to solve.')
+    parser.add_argument('--model_name', type=str, default='gru', help='Model to use.')
+    parser.add_argument('--tasks', type=str, default='A,B,C,D', help='Tasks to learn.')
+    parser.add_argument('--nums_train', type=str, default='800, 100, 100, 100', help='Number of training paths.')
+    parser.add_argument('--data_folder', type=str, default='./data/plates', help='Path to folder with data.')
     
-    file_names = [f'../data/plates/{task}.pkl' for task in tasks]
-
+    parser.add_argument('--input_size', type=int, default=3, help='Number of input neurons.')
+    parser.add_argument('--output_size', type=int, default=3, help='Number of output neurons.')
+    parser.add_argument('--num_grucells', type=int, default=2, help='Number of GRU cells.')
+    parser.add_argument('--hidden_size', type=int, default=128, help='Number of hidden states.')    
+    parser.add_argument('--seq_len', type=int, default=101, help='Data sequence length.')
     
-    SAVE_MODELS = False
-    SAVE_DATA = True
+    parser.add_argument('--optimizer_name', type=str, default='Adam', help='Optimizer of choice.')
+    parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate.')
+    parser.add_argument('--weight_decay', type=float, default=1e-6, help='Weight decay.')
+    parser.add_argument('--n_epochs', type=int, default=1000, help='Number of training epochs.')
 
-    input_list = ['xx', 'yy', 'xy']
-    output_list = ['xx', 'yy', 'xy']
+    parser.add_argument('--num_tasks', type=int, default=4, help='Number of tasks')
+    parser.add_argument('--alpha', type=float, default=0.95, help='Pruning parameter')
+    parser.add_argument('--num_heads', type=int, default=1, help='Number of heads')
+    
+    parser.add_argument('--save_model', type=bool, default=False, help='Save the model.')
+    parser.add_argument('--save_result', type=bool, default=False, help='Save the results.')
+    parser.add_argument('--result_folder', type=str, default='./result', help='Path to folder with data.')
+    
+    parser.add_argument('--seed', type=int, default=0, help='Random initialization.')
 
-    input_size = 3
-    output_size = 3
-
-    seq_len = 101
+    args = parser.parse_args()   
+    
+    problem = args.problem
+    model_name = args.model_name
+    data_folder = args.data_folder
+    result_folder = args.result_folder
+    
+    tasks = [task for task in args.tasks.split(',')]
+    
+    if problem == 'plasticity-plates':
+        file_names = [f'{data_folder}/{task}.pkl' for task in tasks]
+    else:
+        file_names = [f'{data_folder}/{task}.pickle' for task in tasks]
+        
     num_tasks = len(file_names)
-            
-    hidden_size = 128
-    num_layers = 2
+    
+    SAVE_MODELS = args.save_model
+    SAVE_DATA = args.save_result
+
+    input_size = args.input_size
+    output_size = args.output_size
+    seq_len = args.seq_len          
+    hidden_size = args.hidden_size
+    num_layers = args.num_grucells
 
     num_val = 100
     num_test = 100
 
-    lr = 1e-2
-    n_epochs = 1000
+    optimizer_name = args.optimizer_name
+    lr = args.lr
+    weight_decay = args.weight_decay
+    n_epochs = args.n_epochs
+    alpha = args.alpha
 
-
-    alpha_fc = 0.95
-
-    seed = 0
+    seed = args.seed
 
     all_losses = {}
     all_errors = {}
 
-    nums_train = [800, 400, 200, 100]
+    nums_train = [int(num_train) for num_train in args.nums_train.split(',')]
 
   
     print(f"################## SEED {seed} ##################")
     set_seed(seed)
 
-    for num_train in nums_train:  
-        net = GRU(input_size=input_size, seq_len=seq_len, hidden_size=hidden_size, 
-                  num_layers=num_layers, output_size=output_size, device=device).to(device)
+    #for num_train in nums_train:  
+    net = GRU(input_size=input_size, seq_len=seq_len, hidden_size=hidden_size, 
+              num_layers=num_layers, output_size=output_size, device=device).to(device)
             
 
-        print('Total params: ', gru_total_params_mask(net))
-        optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-6)
-        #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=100, verbose=True)
+    print('Total params: ', gru_total_params_mask(net))
 
-        if SAVE_MODELS:
-            dict_names = {}
-            case_name = ''
-            for task in tasks:
-                dict_names[i] = f'{task}'
-                case_name += f'{task}-'
+    if SAVE_MODELS:
+        if not os.path.exists(result_folder):
+            os.mkdir(result_folder)
+            
+        dict_names = {}
+        case_name = f'{problem}_'
+        for i, task in enumerate(tasks):
+            case_name += f'{task}-'
 
-            case_name = case_name[:-1] 
+        case_name = case_name[:-1] 
 
-            path_to_save = f"{model}_{case_name}_800-{num_train}points_seed{seed}_num-layers{num_layers}_hidden{hidden_size}_lr0.01_alpha{alpha_fc}.pth"
-        else:
-            path_to_save = f"{model}.pth"
+        path_to_save = f"{model_name}_{case_name}_seed{seed}_num-layers{num_layers}_hidden{hidden_size}_lr0.01_alpha{alpha}.pth"
+    else:
+        path_to_save = f"model.pth"
 
 
-        print(f">>>>>>>>>>>>>>>>>>>{num_train} TRAINING POINTS<<<<<<<<<<<<<<<<<<<<")
+    print(f">>>>>>>>>>>>>>>>>>>{nums_train} TRAINING POINTS<<<<<<<<<<<<<<<<<<<<")
             
                            
-        net = continual_learning(net, 
-                                 file_names=file_names, alpha_fc=alpha_fc, 
-                                 optimizer=optimizer, scheduler=None,
-                                 n_epochs=n_epochs, lr=lr, 
-                                 device=device, 
-                                 num_train=num_train,
-                                 num_val=num_val,
-                                 num_test=num_test,
-                                 seed=seed,
-                                 path_to_save=path_to_save,
-                                 verbose=True)                
+    net = continual_learning(net, 
+                             file_names=file_names, alpha=alpha, 
+                             optimizer_name=optimizer_name, scheduler=None,
+                             n_epochs=n_epochs, lr=lr, weight_decay=weight_decay, 
+                             device=device, 
+                             nums_train=nums_train,
+                             num_val=num_val,
+                             num_test=num_test,
+                             seed=seed,
+                             path_to_save=path_to_save,
+                             result_folder=result_folder,
+                             problem=problem
+                            )                
                 
-        losses, errors = eval(net, file_names, num_train=num_train, num_val=num_val, num_test=num_test)
-            
-            
-        all_losses[f"{num_train}_points"] = losses
-        all_errors[f"{num_train}_points"] = errors
+    losses, errors = eval(net, file_names, nums_train=nums_train, num_val=num_val, num_test=num_test, problem=problem)
+         
+    
+    for i in range(len(nums_train)):
+        all_losses[f"{tasks[i]}_{nums_train[i]}points"] = losses[i]
+        all_errors[f"{tasks[i]}_{nums_train[i]}points"] = errors[i]
 
-
-    df_losses = pd.DataFrame(all_losses)
-    df_errors = pd.DataFrame(all_errors)
+    
+    df_losses = pd.DataFrame([all_losses])
+    df_errors = pd.DataFrame([all_errors])
+    
+    print(df_errors)
 
 
     if SAVE_DATA:
+        if not os.path.exists(result_folder):
+            os.mkdir(result_folder)
+            
         dict_names = {}
-        case_name = ''
-        for task in tasks:
+        case_name = f'{problem}_'
+        for i, task in enumerate(tasks):
             dict_names[i] = f'{task}'
             case_name += f'{task}-'
 
@@ -136,9 +166,16 @@ def main():
         df_errors.rename(index = dict_names, inplace = True)
         
         if len(tasks) > 1:
-            df_errors.to_csv(f"{case_name}_error_seed{seed}_num-layers{num_layers}_hidden{hidden_size}_lr{lr}_alpha{alpha_fc}.csv")
+            df_errors.to_csv(f"{result_folder}/{case_name}_error_seed{seed}_num-layers{num_layers}_hidden{hidden_size}_lr{lr}_alpha{alpha}.csv", index=False)
         else:
-            df_errors.to_csv(f"{case_name}_error_seed{seed}_num-layers{num_layers}_hidden{hidden_size}_lr{lr}.csv")
+            df_errors.to_csv(f"{result_folder}/{case_name}_error_seed{seed}_num-layers{num_layers}_hidden{hidden_size}_lr{lr}.csv", index=False)
+            
+    if os.path.exists(f"{result_folder}/model.pth"):
+          os.remove(f"{result_folder}/model.pth") 
+            
+    
+    if os.path.exists(f"{result_folder}/masks_model.pth"):
+          os.remove(f"{result_folder}/masks_model.pth")    
             
     return
 
