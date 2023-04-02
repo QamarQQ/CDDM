@@ -1,5 +1,11 @@
 # CDDM
-Cooperative Data-Driven Modeling
+This repository contains the official implementation of Cooperative Data-Driven Modeling (https://arxiv.org/abs/2211.12971)
 
 
-Yes, yes, I know this repository does not follow the instructions...I will change this later
+## REQUIREMENTS
+
+- Install PyTorch and all requirements using:
+
+      pip install -r requirements.txt
+      
+## TRAINING      
