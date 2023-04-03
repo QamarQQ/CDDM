@@ -8,8 +8,6 @@ This repository contains the official implementation of Cooperative Data-Driven 
       
       git clone https://github.com/bessagroup/CDDM.git
 
-
-
 * Install PyTorch and all other requirements using:
 
       pip install -r requirements.txt
@@ -18,7 +16,7 @@ This repository contains the official implementation of Cooperative Data-Driven 
 
 Run the code with:
 
-      python src/main.py
+      python3 src/main.py
       
 with the following options:
 
@@ -44,7 +42,19 @@ with the following options:
 * `--save_model`: save the model (action='store_true')
 * `--save_result`: save the results (action='store_true')
 * `--result_folder`: path to save the results (default='./result')
-    
+
+### Example
+
+To train the model on data from the folder `data/rve` on tasks ordering `B -> C -> A` with `800, 25, 25` training paths respectively and save results in the folder `./result`, use the following command:
+
+```
+!python3 src/main.py --problem plasticity-rve
+                     --data_folder ./data/rve
+                     --tasks B,C,A
+                     --nums_train 800,25,25
+                     --result_folder ./result
+                     --save_result
+```
 
 ## Citation
 
