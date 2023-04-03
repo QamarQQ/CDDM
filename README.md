@@ -48,12 +48,12 @@ with the following options:
 To train the model on data from the folder `data/rve` on tasks ordering `B -> C -> A` with `800, 25, 25` training paths respectively and save results in the folder `./result`, use the following command:
 
 ```
-!python3 src/main.py --problem plasticity-rve
-                     --data_folder ./data/rve
-                     --tasks B,C,A
-                     --nums_train 800,25,25
-                     --result_folder ./result
-                     --save_result
+python3 src/main.py --problem plasticity-rve
+                    --data_folder ./data/rve
+                    --tasks B,C,A
+                    --nums_train 800,25,25
+                    --result_folder ./result
+                    --save_result
 ```
 
 ## Citation
