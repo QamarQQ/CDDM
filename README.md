@@ -4,13 +4,13 @@ This repository contains the official implementation of Cooperative Data-Driven 
 
 ## Clone the repository
 
-Clone this github repository using:
+* Clone this github repository using:
       
       git clone https://github.com/bessagroup/CDDM.git
 
-## Install requirements
 
-Install PyTorch and all other requirements using:
+
+* Install PyTorch and all other requirements using:
 
       pip install -r requirements.txt
       
@@ -20,8 +20,31 @@ Run the code with:
 
       python src/main.py
       
-with following options:
+with the following options:
 
+* `--problem`: problem to solve (default='plasticity-plates')
+* `--model_name`: model to use (default='gru'; this is the only available option)
+* `--tasks`: tasks to learn (default='A,B,C,D')
+* `--nums_train`: number of training paths for every task (default='800, 100, 100, 100')
+* `--data_folder`: path to the folder with data (default='./data/plates')
+
+* `--input_size`: number of input neurons (default=3)
+* `--output_size`: number of output neurons (default=3)
+* `--num_grucells`: number of GRU cells (default=2)
+* `--hidden_size`: number of features in the hidden state (default=128)    
+* `--seq_len`: data sequence length (default=101)
+    
+* `--optimizer_name`: optimizer to use (default='Adam'; options=['Adam, 'SGD'])
+* `--lr`: learning rate (default=1e-2)
+* `--weight_decay`: weight decay (default=1e-6)
+* `--n_epochs`: number of training epochs (default=1000)
+* `--alpha`: pruning parameter (default=0.95)
+* `--seed` : random initialization (default=0)
+    
+* `--save_model`: save the model (action='store_true')
+* `--save_result`: save the results (action='store_true')
+* `--result_folder`: path to save the results (default='./result')
+    
 
 ## Citation
 
