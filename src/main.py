@@ -35,21 +35,18 @@ def main():
     parser.add_argument('--input_size', type=int, default=3, help='Number of input neurons.')
     parser.add_argument('--output_size', type=int, default=3, help='Number of output neurons.')
     parser.add_argument('--num_grucells', type=int, default=2, help='Number of GRU cells.')
-    parser.add_argument('--hidden_size', type=int, default=128, help='Number of hidden states.')    
+    parser.add_argument('--hidden_size', type=int, default=128, help='Number of features in the hidden state.')    
     parser.add_argument('--seq_len', type=int, default=101, help='Data sequence length.')
     
     parser.add_argument('--optimizer_name', type=str, default='Adam', help='Optimizer of choice.')
     parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate.')
     parser.add_argument('--weight_decay', type=float, default=1e-6, help='Weight decay.')
     parser.add_argument('--n_epochs', type=int, default=1000, help='Number of training epochs.')
-
-    parser.add_argument('--num_tasks', type=int, default=4, help='Number of tasks')
     parser.add_argument('--alpha', type=float, default=0.95, help='Pruning parameter')
-    parser.add_argument('--num_heads', type=int, default=1, help='Number of heads')
     
-    parser.add_argument('--save_model', type=bool, default=False, help='Save the model.')
-    parser.add_argument('--save_result', type=bool, default=False, help='Save the results.')
-    parser.add_argument('--result_folder', type=str, default='./result', help='Path to folder with data.')
+    parser.add_argument('--save_model', action='store_true', help='Save the model.')
+    parser.add_argument('--save_result', action='store_true', help='Save the results.')
+    parser.add_argument('--result_folder', type=str, default='./result', help='Path to save the results.')
     
     parser.add_argument('--seed', type=int, default=0, help='Random initialization.')
 
@@ -60,7 +57,7 @@ def main():
     data_folder = args.data_folder
     result_folder = args.result_folder
     
-    tasks = [task for task in args.tasks.split(',')]
+    tasks = [task.strip() for task in args.tasks.split(',')]
     
     if problem == 'plasticity-plates':
         file_names = [f'{data_folder}/{task}.pkl' for task in tasks]
@@ -92,7 +89,7 @@ def main():
     all_losses = {}
     all_errors = {}
 
-    nums_train = [int(num_train) for num_train in args.nums_train.split(',')]
+    nums_train = [int(num_train.strip()) for num_train in args.nums_train.split(',')]
 
   
     print(f"################## SEED {seed} ##################")
