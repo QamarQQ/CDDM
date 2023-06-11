@@ -4,9 +4,9 @@ import pandas as pd
 import numpy as np
 import random
 
-from utils import *
-from continual_learning import *
-from models import GRU
+from .utils import *
+from .continual_learning import *
+from .models import GRU
 
 import argparse
 
@@ -90,6 +90,9 @@ def main():
     all_errors = {}
 
     nums_train = [int(num_train.strip()) for num_train in args.nums_train.split(',')]
+    
+    if not os.path.exists(result_folder):
+            os.mkdir(result_folder)
 
   
     print(f"################## SEED {seed} ##################")

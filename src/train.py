@@ -17,7 +17,7 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 import numpy as np
 
-from utils import loss_func
+from .utils import loss_func
 import copy
 
 

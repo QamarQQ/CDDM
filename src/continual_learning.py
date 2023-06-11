@@ -12,10 +12,9 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-
-from train import train
-from pruning import gru_pruning
-from utils import *
+from .train import train
+from .pruning import gru_pruning
+from .utils import *
 
 
 if torch.cuda.is_available():

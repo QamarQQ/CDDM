@@ -111,8 +111,6 @@ class GRUCell(nn.Module):
         x2h_active_bias = self.x2h.bias*self.tasks_masks[self.task_id][f'rnn_cell_list.{self.num_layer}.x2h.bias'].to(self.device)
         
         x_t = F.linear(input, weight=x2h_active_weight, bias=x2h_active_bias)
-        #x_t = self.x2h(input)
-        #h_t = self.h2h(hx)
         h2h_active_weight = self.h2h.weight*self.tasks_masks[self.task_id][f'rnn_cell_list.{self.num_layer}.h2h.weight'].to(self.device)
         h2h_active_bias = self.h2h.bias*self.tasks_masks[self.task_id][f'rnn_cell_list.{self.num_layer}.h2h.bias'].to(self.device)
         h_t = F.linear(hx, weight=h2h_active_weight, bias=h2h_active_bias)
@@ -123,7 +121,6 @@ class GRUCell(nn.Module):
         reset_gate = torch.sigmoid(x_reset + h_reset)
         update_gate = torch.sigmoid(x_upd + h_upd)
         new_gate = torch.tanh(x_new + (reset_gate * h_new))
-        #new_gate = torch.nn.functional.relu(x_new + (reset_gate * h_new))
 
         hy = update_gate * hx + (1 - update_gate) * new_gate
 

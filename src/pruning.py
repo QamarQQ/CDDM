@@ -21,7 +21,6 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 import numpy as np
 
-from utils import loss_func, gru_total_params_mask
 import copy
 
 
