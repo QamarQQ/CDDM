@@ -5,12 +5,15 @@ This repository contains the official implementation of Cooperative Data-Driven 
 ## Clone the repository
 
 * Clone this github repository using:
-      
-      git clone https://github.com/bessagroup/CDDM.git
+```      
+git clone https://github.com/bessagroup/CDDM.git
+cd CDDM
+```
 
 * Install PyTorch and all other requirements using:
-
-      pip install -r requirements.txt
+```
+pip install -r requirements.txt
+```
       
 ## Train the model
 
