@@ -1,6 +1,8 @@
 # Cooperative data-driven modeling (CDDM)
-This repository contains the official implementation of Cooperative Data-Driven Modeling (https://arxiv.org/abs/2211.12971)
+This repository contains the official implementation of Cooperative Data-Driven Modeling (https://arxiv.org/abs/2211.12971) by Aleksandr Dekhovich, O. Taylan Turan, Jiaxiang Yi and Miguel A. Bessa.
 
+## Introduction
+Data-driven modeling in mechanics is evolving rapidly based on recent machine learning advances, especially on artificial neural networks. As the field matures, new data and models created by different groups become available, opening possibilities for cooperative modeling. However, artificial neural networks suffer from catastrophic forgetting, i.e. they forget how to perform an old task when trained on a new one. This hinders cooperation because adapting an existing model for a new task affects the performance on a previous task trained by someone else. The authors developed a continual learning method that addresses this issue, applying it here for the first time to solid mechanics. In particular, the method is applied to recurrent neural networks to predict history-dependent plasticity behavior, although it can be used on any other architecture (feedforward, convolutional, etc.) and to predict other phenomena. This work intends to spawn future developments on continual learning that will foster cooperative strategies among the mechanics community to solve increasingly challenging problems. We show that the chosen continual learning strategy can sequentially learn several constitutive laws without forgetting them, using less data to achieve the same error as standard training of one law per model.
 
 ## Clone the repository
 
@@ -19,7 +21,7 @@ pip install -r requirements.txt
 
 Run the code with:
 
-      python3 src/main.py
+      python3 -m src.main
       
 with the following options:
 
@@ -51,7 +53,7 @@ with the following options:
 To train the model on data from the folder `data/rve` on tasks ordering `B -> C -> A` with `800, 25, 25` training paths respectively and save results in the folder `./result`, use the following command:
 
 ```
-python3 src/main.py --problem plasticity-rve
+python3 -m src.main --problem plasticity-rve
                     --data_folder ./data/rve
                     --tasks B,C,A
                     --nums_train 800,25,25
