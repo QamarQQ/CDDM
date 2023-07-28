@@ -21,7 +21,7 @@ pip install -r requirements.txt
 
 Run the code with:
 
-      python3 -m src.main
+      python3 -m src.cddm.main
       
 with the following options:
 
